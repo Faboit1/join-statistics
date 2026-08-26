@@ -1,0 +1,8 @@
+name: JoinStatistics-Companion
+version: '${version}'
+main: dev.faboit.joinstats.bukkit.JoinStatsCompanion
+api-version: '1.20'
+author: faboit1
+description: Answers the JoinStatistics proxy plugin's requests for PlaceholderAPI values.
+website: https://github.com/faboit1/join-statistics
+softdepend: [PlaceholderAPI]

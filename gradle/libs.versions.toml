@@ -1,0 +1,27 @@
+[versions]
+velocity = "3.4.0"
+paper = "1.20.1-R0.1-SNAPSHOT"
+placeholderapi = "2.11.6"
+sqlite = "3.53.4.0"
+hikari = "6.3.3"
+geoip2 = "4.2.1"
+caffeine = "3.1.8"
+gson = "2.10.1"
+shadow = "8.3.6"
+junit = "5.11.4"
+
+[libraries]
+velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+geoip2 = { module = "com.maxmind.geoip2:geoip2", version.ref = "geoip2" }
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
