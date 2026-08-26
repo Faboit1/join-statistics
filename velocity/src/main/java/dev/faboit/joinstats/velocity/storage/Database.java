@@ -29,6 +29,14 @@ import org.slf4j.Logger;
  */
 public final class Database implements AutoCloseable {
 
+    /**
+     * Platforms this build ships a SQLite native library for, in the wording shown to operators.
+     * Kept in step with the exclusions in {@code velocity/build.gradle.kts}.
+     */
+    private static final String SUPPORTED_PLATFORMS =
+            "Linux x86_64 and aarch64 (glibc and musl), Windows x86_64, and macOS x86_64 and "
+                    + "aarch64";
+
     private final Logger logger;
     private final Path file;
     private final HikariDataSource dataSource;
@@ -74,7 +82,49 @@ public final class Database implements AutoCloseable {
             if (settings.vacuumThreshold > 0) {
                 maybeVacuum(connection, settings.vacuumThreshold);
             }
+        } catch (SQLException | LinkageError e) {
+            throw explainNativeFailure(e);
         }
+    }
+
+    /**
+     * Turns a missing native library into an error that says what to do about it.
+     *
+     * <p>sqlite-jdbc bundles a native library for twenty platforms, which is 20 MB and more than
+     * the upload limit of a default hosting panel, so this build ships only the platforms a
+     * Velocity proxy is realistically run on. On anything else the driver fails several frames
+     * deep with a message that reads like database corruption rather than a packaging decision.
+     */
+    private Exception explainNativeFailure(Throwable cause) {
+        if (!mentionsMissingNative(cause)) {
+            return cause instanceof Exception checked ? checked : new Exception(cause);
+        }
+        String platform = System.getProperty("os.name") + " / " + System.getProperty("os.arch");
+        logger.error("No bundled SQLite native library matches this platform ({}). This build "
+                + "ships {}. If you genuinely run a proxy on something else, please open an "
+                + "issue: restoring a platform is a one-line build change, left out only because "
+                + "the full set pushes the jar past the upload limit of most hosting panels.",
+                platform, SUPPORTED_PLATFORMS);
+        return new SQLException("No SQLite native library for " + platform, cause);
+    }
+
+    /** Walks the cause chain looking for sqlite-jdbc's native-loading complaint. */
+    private static boolean mentionsMissingNative(Throwable error) {
+        Throwable cause = error;
+        for (int depth = 0; cause != null && depth < 16; depth++) {
+            if (cause instanceof UnsatisfiedLinkError) {
+                return true;
+            }
+            String message = cause.getMessage();
+            if (message != null && message.contains("No native library")) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     /** SQLite rejects an unknown synchronous mode outright, so clamp to the three valid ones. */

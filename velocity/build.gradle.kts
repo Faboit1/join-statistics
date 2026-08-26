@@ -82,6 +82,26 @@ tasks.shadowJar {
         exclude(dependency("org.jetbrains:annotations"))
     }
 
+    // sqlite-jdbc bundles a native library for twenty platforms, which is 20 MB and the
+    // overwhelming bulk of this jar. Most Minecraft panels cap uploads at 10 MB (PHP's default),
+    // so shipping all of them makes the plugin impossible to install through the very interface
+    // most operators have. Keep the platforms a Velocity proxy is actually run on — Linux and
+    // Alpine on Intel and ARM, plus Windows and macOS for local testing — and drop the rest.
+    // Database.java turns the resulting load failure into an explicit, actionable message.
+    listOf(
+        "FreeBSD/**",
+        "Linux/ppc64/**",
+        "Linux/riscv64/**",
+        "Linux/x86/**",
+        "Linux/arm/**",
+        "Linux/armv6/**",
+        "Linux/armv7/**",
+        "Linux-Musl/x86/**",
+        "Windows/x86/**",
+        "Windows/armv7/**",
+        "Windows/aarch64/**",
+    ).forEach { exclude("org/sqlite/native/$it") }
+
     // org.sqlite is deliberately NOT relocated: the driver resolves its bundled
     // native libraries through hard-coded resource paths.
     relocate("com.zaxxer.hikari", "dev.faboit.joinstats.libs.hikari")
