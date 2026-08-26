@@ -408,17 +408,21 @@ final class Rendering {
             return Component.text("  no samples in this window", label());
         }
         List<Integer> buckets = downsample(samples, width);
-        int max = 1;
+        int peak = 0;
         for (int sample : buckets) {
-            max = Math.max(max, sample);
+            peak = Math.max(peak, sample);
         }
+        // The divisor is floored at one so an all-zero window does not divide by zero. The
+        // reported peak is the real maximum, which is not the same number: reusing the divisor
+        // made an empty proxy claim a peak of one player.
+        int scale = Math.max(1, peak);
         StringBuilder chart = new StringBuilder(buckets.size());
         for (int sample : buckets) {
-            chart.append(RAMP[Math.min(RAMP.length - 1, sample * (RAMP.length - 1) / max)]);
+            chart.append(RAMP[Math.min(RAMP.length - 1, sample * (RAMP.length - 1) / scale)]);
         }
         return Component.text()
                 .append(Component.text("  " + chart, accent()))
-                .append(Component.text("  peak " + max, label()))
+                .append(Component.text("  peak " + peak, label()))
                 .build();
     }
 

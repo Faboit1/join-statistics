@@ -558,12 +558,16 @@ public final class JoinStatsCommand {
                             String.valueOf(summary.samples()), render.value())));
 
                     plugin.population().peak().thenAccept(peak -> source.sendMessage(
-                            render.row("all-time peak", Component.text()
-                                    .append(Component.text(String.valueOf(peak.total()),
-                                            render.good()))
-                                    .append(Component.text("  ", render.label()))
-                                    .append(render.when(peak.at()))
-                                    .build())));
+                            render.row("all-time peak", peak.total() <= 0
+                                    // Before anyone has ever connected the highest sample is
+                                    // zero, and timestamping that reads as a real observation.
+                                    ? Component.text("nobody has connected yet", render.label())
+                                    : Component.text()
+                                            .append(Component.text(String.valueOf(peak.total()),
+                                                    render.good()))
+                                            .append(Component.text("  ", render.label()))
+                                            .append(render.when(peak.at()))
+                                            .build())));
 
                     plugin.population().latestBreakdown(PopulationDao.SCOPE_SERVER)
                             .thenAccept(perServer -> {
