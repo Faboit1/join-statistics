@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and release, without the leading v'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve the version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            version="${{ github.event.inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          declared="$(grep '^pluginVersion=' gradle.properties | cut -d= -f2)"
+          if [ "${declared}" != "${version}" ]; then
+            echo "::warning::gradle.properties says ${declared} but this release is ${version}."
+          fi
+
+      - name: Build
+        env:
+          JOINSTATS_VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew build --stacktrace
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: JoinStatistics ${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.version.outputs.version) }}
+          generate_release_notes: true
+          draft: false
+          body: |
+            ## Installing
+
+            - **`JoinStatistics-Velocity-${{ steps.version.outputs.version }}.jar`** goes in the
+              Velocity proxy's `plugins/` directory. This is the plugin; it works on its own.
+            - **`JoinStatistics-Companion-${{ steps.version.outputs.version }}.jar`** is optional
+              and goes on the backend Paper/Spigot servers, alongside PlaceholderAPI. It is only
+              needed if you want backend placeholder values recorded.
+
+            Both must be the same version — the bridge between them refuses a mismatched peer.
+          files: |
+            velocity/build/libs/JoinStatistics-Velocity-${{ steps.version.outputs.version }}.jar
+            bukkit/build/libs/JoinStatistics-Companion-${{ steps.version.outputs.version }}.jar
+          fail_on_unmatched_files: true

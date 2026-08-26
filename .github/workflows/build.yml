@@ -1,0 +1,116 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push to the same branch makes the in-flight run redundant.
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Needed for the short SHA used in the dev build's version stamp.
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+      - name: Stamp the version
+        id: version
+        run: |
+          base="$(grep '^pluginVersion=' gradle.properties | cut -d= -f2)"
+          if [ "${{ github.ref }}" = "refs/heads/${{ github.event.repository.default_branch }}" ]; then
+            version="${base}-dev.$(git rev-parse --short HEAD)"
+          else
+            version="${base}-SNAPSHOT"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Building ${version}"
+
+      - name: Build
+        env:
+          JOINSTATS_VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew build --stacktrace
+
+      - name: Upload the proxy plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: JoinStatistics-Velocity
+          path: |
+            velocity/build/libs/JoinStatistics-Velocity-*.jar
+            !velocity/build/libs/*-sources.jar
+          if-no-files-found: error
+
+      - name: Upload the backend companion
+        uses: actions/upload-artifact@v4
+        with:
+          name: JoinStatistics-Companion
+          path: |
+            bukkit/build/libs/JoinStatistics-Companion-*.jar
+            !bukkit/build/libs/*-sources.jar
+          if-no-files-found: error
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: '*/build/reports/tests/test'
+          if-no-files-found: ignore
+
+  # Keeps a downloadable build of the default branch available without cutting a release.
+  dev-release:
+    name: Publish the rolling dev build
+    needs: build
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: JoinStatistics-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Update the dev prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          name: Development build
+          prerelease: true
+          # Always points at the latest default-branch commit, so the tag is moved each time.
+          target_commitish: ${{ github.sha }}
+          body: |
+            Automatic build of `${{ github.sha }}` from the default branch.
+
+            This is not a release. It is whatever the branch happened to contain when it was
+            built, so treat it accordingly. Tagged releases are on the releases page.
+          files: artifacts/*.jar
+          fail_on_unmatched_files: true
