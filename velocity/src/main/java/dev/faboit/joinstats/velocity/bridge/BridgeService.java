@@ -103,11 +103,29 @@ public final class BridgeService {
             }
         });
 
-        if (!connection.sendPluginMessage(CHANNEL, frame)) {
+        if (!send(connection, frame)) {
             pending.remove(requestId);
             return CompletableFuture.completedFuture(Map.of());
         }
         return future;
+    }
+
+    /**
+     * Sends a frame down a backend connection, treating a dead one as a failed send.
+     *
+     * <p>{@code sendPluginMessage} does not merely return false once the channel is gone — it
+     * throws {@link IllegalStateException}. A player quitting is exactly when that happens, and
+     * letting it escape put an optional feature in a position to break whatever the caller was
+     * doing.
+     */
+    private boolean send(ServerConnection connection, byte[] frame) {
+        try {
+            return connection.sendPluginMessage(CHANNEL, frame);
+        } catch (RuntimeException e) {
+            logger.debug("Backend connection for {} was gone before the frame could be sent.",
+                    connection.getServerInfo().getName(), e);
+            return false;
+        }
     }
 
     /** Asks a backend to describe itself. Requires at least one player on that server. */
@@ -122,7 +140,7 @@ public final class BridgeService {
 
         byte[] frame = BridgeCodec.frame(BridgeProtocol.REQUEST_SERVER_INFO,
                 out -> out.writeLong(requestId));
-        if (!connection.sendPluginMessage(CHANNEL, frame)) {
+        if (!send(connection, frame)) {
             pending.remove(requestId);
             return CompletableFuture.completedFuture(null);
         }
@@ -199,7 +217,9 @@ public final class BridgeService {
             }
         }
 
-        source.sendPluginMessage(CHANNEL, BridgeCodec.frame(BridgeProtocol.WELCOME,
+        // Same hazard as above: the carrying connection may already be gone by the time we
+        // answer a handshake, and a failed courtesy reply must not become an exception.
+        send(source, BridgeCodec.frame(BridgeProtocol.WELCOME,
                 out -> BridgeCodec.writeString(out,
                         dev.faboit.joinstats.velocity.BuildConstants.VERSION)));
     }
