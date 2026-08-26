@@ -159,9 +159,15 @@ public final class PlaceholderService {
         }
     }
 
-    /** One last capture before a session is written out, if the operator asked for it. */
-    public void captureOnQuit(Player player) {
-        if (enabled() && config.get().placeholders.captureOnQuit) {
+    /**
+     * Captures values as a player moves between backends.
+     *
+     * <p>The last point at which a player's placeholders can be read at all: resolution happens
+     * on the backend, over that player's own connection, so once they disconnect there is
+     * nothing left to ask.
+     */
+    public void captureOnServerChange(Player player) {
+        if (enabled() && config.get().placeholders.refreshOnServerChange) {
             refresh(player);
         }
     }
