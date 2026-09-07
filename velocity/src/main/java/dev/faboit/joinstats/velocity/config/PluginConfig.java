@@ -434,8 +434,14 @@ public class PluginConfig {
                 that whatever the backend does on join has finished first.""")
         public String joinDelay = "5s";
 
-        @Comment("Also resolve one final time just before a session is finalised.")
-        public boolean captureOnQuit = true;
+        @Comment("""
+                Also resolve when a player changes backend server, on top of the interval above.
+                Placeholders are resolved by the backend over the player's own connection, so
+                there is no way to capture them as someone quits — by the time the proxy learns
+                of a disconnect the connection carrying the request is already gone. A server
+                change is the last moment the values can actually be read, which makes it the
+                closest thing to a capture-on-quit that can exist.""")
+        public boolean refreshOnServerChange = true;
 
         @Comment("""
                 Keep every observed value, not just the latest one, so a placeholder can be

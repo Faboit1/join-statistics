@@ -138,6 +138,14 @@ public final class SessionDao {
                                 SELECT COUNT(*) FROM js_sessions s
                                  WHERE s.uuid = js_players.uuid AND s.crashed = 1
                                    AND s.ended_at > js_players.last_quit), 0),
+                            longest_session = MAX(longest_session, COALESCE((
+                                SELECT MAX(duration) FROM js_sessions s
+                                 WHERE s.uuid = js_players.uuid AND s.crashed = 1
+                                   AND s.ended_at > js_players.last_quit), 0)),
+                            last_seen       = MAX(last_seen, COALESCE((
+                                SELECT MAX(ended_at) FROM js_sessions s
+                                 WHERE s.uuid = js_players.uuid AND s.crashed = 1
+                                   AND s.ended_at > js_players.last_quit), 0)),
                             last_quit       = COALESCE((
                                 SELECT MAX(ended_at) FROM js_sessions s
                                  WHERE s.uuid = js_players.uuid AND s.crashed = 1), last_quit)

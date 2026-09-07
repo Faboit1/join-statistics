@@ -267,6 +267,11 @@ class SessionLifecycleTest {
         PlayerProfile profile = players.find(player).join().orElseThrow();
         assertEquals(1, profile.sessions(), "recovery must fold the session into the profile");
         assertEquals(120 * SECOND, profile.playtime());
+        assertEquals(120 * SECOND, profile.longestSession(),
+                "a recovered session must be able to set the longest-session high-water mark, "
+                        + "or the leaderboard silently under-reports after every crash");
+        assertEquals(start + 120 * SECOND, profile.lastSeen(),
+                "recovery must move last-seen to when the session actually ended");
 
         // Running recovery again must not count the same session a second time.
         assertEquals(0, sessionDao.recoverOpenSessions().join());

@@ -255,7 +255,9 @@ public final class ConnectionListener {
         if (!config.get().tracking.disconnects) {
             return;
         }
-        placeholders.captureOnQuit(player);
+        // Closing the session comes first and is never conditional on anything optional
+        // succeeding. An exception thrown before this line leaves the session open forever:
+        // no end time, no playtime, and a row that still reads as live months later.
         sessions.handleDisconnect(player.getUniqueId(), now,
                 event.getLoginStatus() == null ? null : event.getLoginStatus().name());
     }
@@ -280,6 +282,18 @@ public final class ConnectionListener {
                 .map(registered -> registered.getServerInfo().getName()).orElse(null);
         sessions.handleServerConnected(player.getUniqueId(), server, previous,
                 System.currentTimeMillis());
+
+        // Only on a genuine switch: the first server of a session already has a delayed
+        // capture scheduled by the join path, and doing both would double every request.
+        if (previous != null && placeholders.enabled()) {
+            UUID uuid = player.getUniqueId();
+            long delay = Math.max(1L, settings.placeholders.delayAfterJoin().toMillis());
+            proxy.getScheduler().buildTask(plugin, () -> {
+                if (proxy.getPlayer(uuid).isPresent()) {
+                    placeholders.captureOnServerChange(player);
+                }
+            }).delay(delay, TimeUnit.MILLISECONDS).schedule();
+        }
     }
 
     @Subscribe
